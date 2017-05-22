@@ -1,4 +1,4 @@
-from common import DELETE
+from aws_parsecf.common import DELETE
 from functools import partial
 import base64
 import boto3
@@ -244,8 +244,8 @@ MAP = {
         'Ref': ref,
         }
 
-from parser import _exploded
-import conditions
+from aws_parsecf.parser import _exploded
+from aws_parsecf import conditions
 
 def _find_att(root, current, key, default_region):
     if isinstance(current, dict):
