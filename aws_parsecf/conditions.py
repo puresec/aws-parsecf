@@ -1,4 +1,4 @@
-from common import DELETE
+from aws_parsecf.common import DELETE
 
 def evaluate(root, condition, default_region):
     if isinstance(condition, str):
@@ -119,4 +119,4 @@ MAP = {
         'Fn::Or': fn_or,
         }
 
-from parser import _exploded
+from aws_parsecf.parser import _exploded

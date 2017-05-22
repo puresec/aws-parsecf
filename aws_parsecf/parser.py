@@ -1,20 +1,32 @@
-from common import DELETE
+from aws_parsecf.common import DELETE
+import boto3
+import json
+import yaml
 
-def explode(root, default_region, current=None):
+def load_json(stream, default_region=boto3.Session().region_name):
+    return _explode(json.load(stream), default_region)
+
+def loads_json(string, default_region=boto3.Session().region_name):
+    return _explode(string.loads(string), default_region)
+
+def load_yaml(stream_or_string, default_region=boto3.Session().region_name):
+    return _explode(yaml.load(stream_or_string), default_region)
+
+def _explode(root, default_region, current=None):
     """
     >>> import json
 
-    >>> print(json.dumps(explode({
+    >>> print(json.dumps(_explode({
     ...     'Conditions': {'ConditionName': {'Fn::Equals': [1, 2]}},
     ...     'Resources': {'SomeResource': {'Condition': 'ConditionName', 'Type': 'AWS::Lambda::Function'}}
     ...     }, 'us-east-1'), sort_keys=True))
     {"Conditions": {"ConditionName": false}, "Resources": {}}
-    >>> print(json.dumps(explode({
+    >>> print(json.dumps(_explode({
     ...     'Conditions': {'ConditionName': {'Fn::Equals': [1, 2]}},
     ...     'Resources': {'SomeResource': {'Attribute': {'Fn::If': ['ConditionName', '1', {'Ref': 'AWS::NoValue'}]}, 'Type': 'AWS::Lambda::Function'}}
     ...     }, 'us-east-1'), sort_keys=True))
     {"Conditions": {"ConditionName": false}, "Resources": {"SomeResource": {"Type": "AWS::Lambda::Function"}}}
-    >>> print(json.dumps(explode({
+    >>> print(json.dumps(_explode({
     ...     'Conditions': {'ConditionName': {'Fn::Equals': [{'Ref': 'SomeBucket'}, 'SomeBucketName']}},
     ...     'Resources':
     ...         {'SomeBucket': {'Properties': {'BucketName': 'SomeBucketName'}, 'Type': 'AWS::S3::Bucket'},
@@ -40,7 +52,7 @@ def explode(root, default_region, current=None):
     """
     if current is None:
         current = root
-        explode(root, default_region, root)
+        _explode(root, default_region, root)
         _cleanup(root)
         return root
 
@@ -100,10 +112,10 @@ def _cleanup(current):
 def _exploded(root, collection, key, default_region):
     if collection[key] is None:
         return None
-    exploded = explode(root, default_region, collection[key])
+    exploded = _explode(root, default_region, collection[key])
     if exploded is not None:
         collection[key] = exploded
     return collection[key]
 
-import conditions
-import functions
+from aws_parsecf import conditions
+from aws_parsecf import functions
