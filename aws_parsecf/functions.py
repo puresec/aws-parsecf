@@ -79,23 +79,38 @@ def fn_get_att(root, value, default_region):
     ...     ['SomeResource', 'SomeKey'], 'us-east-1'
     ...     )
     'SomeValue'
+    >>> fn_get_att(
+    ...     {'Resources': {'SomeResource': {}},
+    ...      'Fn::GetAtt': ['SomeResource', 'SomeKey']},
+    ...     ['SomeResource', 'SomeKey'], 'us-east-1'
+    ...     )
+    'UNKNOWN ATT: SomeResource.SomeKey'
     """
 
     resource_name, key = value
     resource = _exploded(root, root['Resources'], resource_name, default_region)
-    return _find_att(root, resource, key, default_region)
+    try:
+        return _find_att(root, resource, key, default_region)
+    except KeyError as e:
+        if e.args != (key,):
+            raise
+        return "UNKNOWN ATT: {}.{}".format(resource_name, key)
 
 def fn_get_azs(root, value, default_region):
     """
-    >>> fn_get_azs(
-    ...     {'Fn::GetAZs': ''},
-    ...     '', 'us-east-1'
-    ...     )
+    >>> import os
+    >>> if os.environ.get('FULL'):
+    ...     fn_get_azs(
+    ...         {'Fn::GetAZs': ''},
+    ...         '', 'us-east-1'
+    ...         )
+    ...     fn_get_azs(
+    ...         {'Fn::GetAZs': 'us-west-1'},
+    ...         'us-west-1', 'us-east-1'
+    ...         )
+    ... else:
+    ...     print('To run this test use FULL=true')
     ['us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e']
-    >>> fn_get_azs(
-    ...     {'Fn::GetAZs': 'us-west-1'},
-    ...     'us-west-1', 'us-east-1'
-    ...     )
     ['us-west-1a', 'us-west-1c']
     """
 
@@ -254,14 +269,18 @@ def _find_att(root, current, key, default_region):
         for value in current.values():
             try:
                 result = _find_att(root, value, key, default_region)
-            except KeyError:
+            except KeyError as e:
+                if e.args != (key,):
+                    raise
                 continue
             return result
     elif isinstance(current, list):
         for value in current:
             try:
                 result = _find_att(root, value, key, default_region)
-            except KeyError:
+            except KeyError as e:
+                if e.args != (key,):
+                    raise
                 continue
             return result
     raise KeyError(key)
