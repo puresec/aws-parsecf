@@ -61,8 +61,6 @@ Running tests:
 
 Missing pieces:
 
--  ``Fn::ImportValue`` - this one requires linking multiple templates
-   (preferred method) or using the API
 -  ``Ref`` - currently supports a handful of resource types
 
 You know the drill, PR!
