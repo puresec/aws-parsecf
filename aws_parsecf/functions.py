@@ -1,304 +1,352 @@
 from aws_parsecf.common import DELETE
-from functools import partial
 import base64
 import boto3
 import re
 
-def evaluate(root, function_type, value, default_region):
-    return MAP[function_type](root, value, default_region)
+class Functions:
+    def __init__(self, parser, root, default_region):
+        self.parser = parser
+        self.root = root
+        self.default_region = default_region
 
-def fn_base64(root, value, default_region):
-    """
-    >>> fn_base64({'Fn::Base64': 'hello'}, 'hello', 'us-east-1')
-    'aGVsbG8='
-    """
-    if isinstance(value, str):
-        value = value.encode()
-    return base64.b64encode(value).decode()
+    MAP = {
+            'Fn::Base64': 'fn_base64',
+            'Fn::If': 'fn_if',
+            'Fn::FindInMap': 'fn_find_in_map',
+            'Fn::GetAtt': 'fn_get_att',
+            'Fn::GetAZs': 'fn_get_azs',
+            'Fn::ImportValue': 'fn_import_value',
+            'Fn::Join': 'fn_join',
+            'Fn::Select': 'fn_select',
+            'Fn::Split': 'fn_split',
+            'Fn::Sub': 'fn_sub',
+            'Ref': 'ref',
+            }
 
-def fn_if(root, value, default_region):
-    """
-    >>> fn_if(
-    ...     {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 1]}},
-    ...      'Fn::If': ['EqualsCondition', 10, 20]},
-    ...     ['EqualsCondition', 10, 20], 'us-east-1'
-    ...     )
-    10
-    >>> fn_if(
-    ...     {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 2]}},
-    ...      'Fn::If': ['EqualsCondition', 10, 20]},
-    ...     ['EqualsCondition', 10, 20], 'us-east-1'
-    ...     )
-    20
-    """
+    def evaluate(self, function_type, value):
+        return getattr(self, Functions.MAP[function_type])(value)
 
-    condition_name, true_value, false_value = value
-    if conditions.evaluate(root, condition_name, default_region):
-        return true_value
-    else:
-        return false_value
+    def fn_base64(self, value):
+        """
+        >>> Functions(None,
+        ...     {'Fn::Base64': 'hello'},
+        ...     'us-east-1'
+        ...     ).fn_base64('hello')
+        'aGVsbG8='
+        """
+        if isinstance(value, str):
+            value = value.encode()
+        return base64.b64encode(value).decode()
 
-def fn_find_in_map(root, value, default_region):
-    """
-    >>> fn_find_in_map(
-    ...     {'Mappings': {'RegionMap':
-    ...         {'us-east-1': {'32': 'ami-6411e20d', '64': 'ami-7a11e213'},
-    ...          'us-west-1': { '32' : 'ami-c9c7978c', '64' : 'ami-cfc7978a'}}},
-    ...      'Fn::FindInMap': ['RegionMap', 'us-west-1', '32']},
-    ...     ['RegionMap', 'us-west-1', '32'], 'us-east-1'
-    ...     )
-    'ami-c9c7978c'
-    >>> fn_find_in_map(
-    ...     {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 1]}},
-    ...      'Mappings': {'RegionMap':
-    ...         {'us-east-1': {'Fn::If': ['EqualsCondition', 'ami-c9c7978c', 'ami-cfc7978a']}}},
-    ...      'Fn::FindInMap': ['RegionMap', 'us-east-1']},
-    ...     ['RegionMap', 'us-east-1'], 'us-east-1'
-    ...     )
-    'ami-c9c7978c'
-    """
+    def fn_if(self, value):
+        """
+        >>> from aws_parsecf.parser import Parser
 
-    current = root['Mappings']
-    for index, key in enumerate(value):
-        current = _exploded(root, current, key, default_region)
-    return current
+        >>> root = {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 1]}},
+        ...         'Fn::If': ['EqualsCondition', 10, 20]}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_if(['EqualsCondition', 10, 20])
+        10
 
-def fn_get_att(root, value, default_region):
-    """
-    >>> fn_get_att(
-    ...     {'Resources':
-    ...         {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
-    ...      'Fn::GetAtt': ['SomeResource', 'SomeKey']},
-    ...     ['SomeResource', 'SomeKey'], 'us-east-1'
-    ...     )
-    'SomeValue'
-    >>> fn_get_att(
-    ...     {'Resources':
-    ...         {'SomeResource': {'Properties': {'List': [{'SomeKey': 'SomeValue'}]}}},
-    ...      'Fn::GetAtt': ['SomeResource', 'SomeKey']},
-    ...     ['SomeResource', 'SomeKey'], 'us-east-1'
-    ...     )
-    'SomeValue'
-    >>> fn_get_att(
-    ...     {'Resources': {'SomeResource': {}},
-    ...      'Fn::GetAtt': ['SomeResource', 'SomeKey']},
-    ...     ['SomeResource', 'SomeKey'], 'us-east-1'
-    ...     )
-    'UNKNOWN ATT: SomeResource.SomeKey'
-    """
+        >>> root = {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 2]}},
+        ...         'Fn::If': ['EqualsCondition', 10, 20]}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_if(['EqualsCondition', 10, 20])
+        20
+        """
 
-    resource_name, key = value
-    resource = _exploded(root, root['Resources'], resource_name, default_region)
-    try:
-        return _find_att(root, resource, key, default_region)
-    except KeyError as e:
-        if e.args != (key,):
-            raise
-        return "UNKNOWN ATT: {}.{}".format(resource_name, key)
+        condition_name, true_value, false_value = value
+        if self.parser.conditions.evaluate(condition_name):
+            return true_value
+        else:
+            return false_value
 
-def fn_get_azs(root, value, default_region):
-    """
-    >>> import os
-    >>> if os.environ.get('FULL'):
-    ...     fn_get_azs(
-    ...         {'Fn::GetAZs': ''},
-    ...         '', 'us-east-1'
-    ...         )
-    ...     fn_get_azs(
-    ...         {'Fn::GetAZs': 'us-west-1'},
-    ...         'us-west-1', 'us-east-1'
-    ...         )
-    ... else:
-    ...     print('To run this test use FULL=true')
-    ['us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e']
-    ['us-west-1a', 'us-west-1c']
-    """
+    def fn_find_in_map(self, value):
+        """
+        >>> from aws_parsecf.parser import Parser
 
-    return [
-            zone['ZoneName'] for zone in
-            boto3.client('ec2', region_name=value or default_region).describe_availability_zones()['AvailabilityZones']
-            ]
+        >>> root = {'Mappings': {'RegionMap':
+        ...             {'us-east-1': {'32': 'ami-6411e20d', '64': 'ami-7a11e213'},
+        ...             'us-west-1': { '32' : 'ami-c9c7978c', '64' : 'ami-cfc7978a'}}},
+        ...         'Fn::FindInMap': ['RegionMap', 'us-west-1', '32']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_find_in_map(['RegionMap', 'us-west-1', '32'])
+        'ami-c9c7978c'
 
-def fn_import_value(root, value, default_region):
-    pass
+        >>> root = {'Conditions': {'EqualsCondition': {'Fn::Equals': [1, 1]}},
+        ...         'Mappings': {'RegionMap':
+        ...             {'us-east-1': {'Fn::If': ['EqualsCondition', 'ami-c9c7978c', 'ami-cfc7978a']}}},
+        ...         'Fn::FindInMap': ['RegionMap', 'us-east-1']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_find_in_map(['RegionMap', 'us-east-1'])
+        'ami-c9c7978c'
+        """
 
-def fn_join(root, value, default_region):
-    """
-    >>> fn_join(
-    ...     {'Fn::Join': [':', ['a', 'b', 'c']]},
-    ...     [':', ['a', 'b', 'c']], 'us-east-1'
-    ...     )
-    'a:b:c'
-    """
+        current = self.root['Mappings']
+        for index, key in enumerate(value):
+            current = self.parser.exploded(current, key)
+        return current
 
-    delimeter, values = value
-    return delimeter.join(values)
+    def fn_get_att(self, value):
+        """
+        >>> from aws_parsecf.parser import Parser
 
-def fn_select(root, value, default_region):
-    """
-    >>> fn_select(
-    ...     {'Fn::Select': ['1', ['a', 'b', 'c', 'd', 'e']]},
-    ...     ['1', ['a', 'b', 'c', 'd', 'e']], 'us-east-1'
-    ...     )
-    'b'
-    """
+        >>> root = {'Resources':
+        ...             {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
+        ...         'Fn::GetAtt': ['SomeResource', 'SomeKey']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_get_att(['SomeResource', 'SomeKey'])
+        'SomeValue'
 
-    index, values = value
-    return values[int(index)]
+        >>> root = {'Resources':
+        ...             {'SomeResource': {'Properties': {'List': [{'SomeKey': 'SomeValue'}]}}},
+        ...         'Fn::GetAtt': ['SomeResource', 'SomeKey']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_get_att(['SomeResource', 'SomeKey'])
+        'SomeValue'
 
-def fn_split(root, value, default_region):
-    """
-    >>> fn_split(
-    ...     {'Fn::Split': ['|', 'a|b|c']},
-    ...     ['|', 'a|b|c'], 'us-east-1'
-    ...     )
-    ['a', 'b', 'c']
-    """
+        >>> root = {'Resources': {'SomeResource': {}},
+        ...         'Fn::GetAtt': ['SomeResource', 'SomeKey']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_get_att(['SomeResource', 'SomeKey'])
+        'UNKNOWN ATT: SomeResource.SomeKey'
+        """
 
-    delimeter, value = value
-    return value.split(delimeter)
+        resource_name, key = value
+        resource = self.parser.exploded(self.root['Resources'], resource_name)
+        try:
+            return self._find_att(resource, key)
+        except KeyError as e:
+            if e.args != (key,):
+                raise
+            return "UNKNOWN ATT: {}.{}".format(resource_name, key)
 
-def fn_sub(root, value, default_region):
-    """
-    >>> fn_sub(
-    ...     {'Fn::Sub': ['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}]},
-    ...     ['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}], 'us-east-1'
-    ...     )
-    'hello-world NOW'
-    >>> fn_sub(
-    ...     {'Fn::Sub': 'hello world'},
-    ...     'hello world', 'us-east-1'
-    ...     )
-    'hello world'
-    >>> fn_sub(
-    ...     {'Resources':
-    ...         {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
-    ...      'Fn::Sub': 'hello ${SomeResource.SomeKey}'},
-    ...      'hello ${SomeResource.SomeKey}', 'us-east-1'
-    ...     )
-    'hello SomeValue'
-    >>> fn_sub(
-    ...     {'Resources':
-    ...         {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
-    ...      'Fn::Sub': 'hello ${!SomeResource.SomeKey}'},
-    ...      'hello ${!SomeResource.SomeKey}', 'us-east-1'
-    ...     )
-    'hello ${SomeResource.SomeKey}'
-    """
+    def fn_get_azs(self, value):
+        """
+        >>> import os
+        >>> if os.environ.get('FULL'):
+        ...     Functions(None,
+        ...         {'Fn::GetAZs': ''},
+        ...         'us-east-1'
+        ...         ).fn_get_azs('')
+        ...     Functions(None,
+        ...         {'Fn::GetAZs': 'us-west-1'},
+        ...         'us-east-1'
+        ...         ).fn_get_azs('us-west-1')
+        ... else:
+        ...     print('To run this test use FULL=true')
+        ['us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e']
+        ['us-west-1a', 'us-west-1c']
+        """
 
-    if isinstance(value, list):
-        value, variables = value
-    else:
-        # only template parameter names, resource logical IDs, and resource attributes, will be parsed
-        value, variables = value, {}
+        return [
+                zone['ZoneName'] for zone in
+                boto3.client('ec2', region_name=value or self.default_region).describe_availability_zones()['AvailabilityZones']
+                ]
 
-    for name, target in variables.items():
-        value = value.replace('${{{}}}'.format(name), target)
+    def fn_import_value(self, value):
+        if hasattr(self, '_import_value_cache'):
+            return self._import_value_cache[value]
+        self._import_value_cache = dict(
+                (export['Name'], export['Value']) for export in
+                boto3.client('cloudformation', region_name=self.default_region).list_exports()['Exports']
+                )
+        return self._import_value_cache[value]
 
-    return SUB_VARIABLE_PATTERN.sub(partial(_sub_variable, root, default_region), value)
+    def fn_join(self, value):
+        """
+        >>> Functions(None,
+        ...     {'Fn::Join': [':', ['a', 'b', 'c']]},
+        ...     'us-east-1'
+        ...     ).fn_join([':', ['a', 'b', 'c']])
+        'a:b:c'
+        """
 
-def ref(root, value, default_region):
-    """
-    >>> ref(
-    ...     {'Ref': 'AWS::Region'},
-    ...     'AWS::Region', 'us-east-1'
-    ...     )
-    'us-east-1'
-    >>> ref(
-    ...     {'Ref': 'AWS::NoValue'},
-    ...     'AWS::NoValue', 'us-east-1'
-    ...     )
-    DELETE
-    >>> ref(
-    ...     {'Resources':
-    ...         {'SomeFunction': {'Type': 'AWS::Lambda::Function', 'Properties': {'FunctionName': 'SomeFunctionName'}}},
-    ...      'Ref': 'SomeFunction'},
-    ...     'SomeFunction', 'us-east-1'
-    ...     )
-    'SomeFunctionName'
-    >>> ref(
-    ...     {'Resources':
-    ...         {'SomeFunction': {'Type': 'AWS::Lambda::Function', 'Properties': {}}},
-    ...      'Ref': 'SomeFunction'},
-    ...     'SomeFunction', 'us-east-1'
-    ...     )
-    'UNKNOWN REF: SomeFunction'
-    >>> ref(
-    ...     {'Ref': 'SomeValue'},
-    ...     'SomeValue', 'us-east-1'
-    ...     )
-    'UNKNOWN REF: SomeValue'
-    """
+        delimeter, values = value
+        return delimeter.join(values)
 
-    # pseudo function?
-    function = REF_PSEUDO_FUNCTIONS.get(value)
-    if function:
-        return function(root, default_region)
-    # resource logical id?
-    if value in root.get('Resources', ()):
-        resource = _exploded(root, root['Resources'], value, default_region)
-        name_type = REF_RESOURCE_TYPE_PATTERN.match(resource['Type'])
-        if name_type:
-            name = resource['Properties'].get("{}Name".format(name_type.group(1)))
-            if name:
-                return name
+    def fn_select(self, value):
+        """
+        >>> Functions(None,
+        ...     {'Fn::Select': ['1', ['a', 'b', 'c', 'd', 'e']]},
+        ...     'us-east-1'
+        ...     ).fn_select(['1', ['a', 'b', 'c', 'd', 'e']])
+        'b'
+        """
 
-    return "UNKNOWN REF: {}".format(value)
+        index, values = value
+        return values[int(index)]
 
-MAP = {
-        'Fn::Base64': fn_base64,
-        'Fn::If': fn_if,
-        'Fn::FindInMap': fn_find_in_map,
-        'Fn::GetAtt': fn_get_att,
-        'Fn::GetAZs': fn_get_azs,
-        'Fn::ImportValue': fn_import_value,
-        'Fn::Join': fn_join,
-        'Fn::Select': fn_select,
-        'Fn::Split': fn_split,
-        'Fn::Sub': fn_sub,
-        'Ref': ref,
-        }
+    def fn_split(self, value):
+        """
+        >>> Functions(None,
+        ...     {'Fn::Split': ['|', 'a|b|c']},
+        ...     'us-east-1'
+        ...     ).fn_split(['|', 'a|b|c'])
+        ['a', 'b', 'c']
+        """
 
-from aws_parsecf.parser import _exploded
-from aws_parsecf import conditions
+        delimeter, value = value
+        return value.split(delimeter)
 
-def _find_att(root, current, key, default_region):
-    if isinstance(current, dict):
-        if key in current:
-            return current[key]
-        for value in current.values():
-            try:
-                result = _find_att(root, value, key, default_region)
-            except KeyError as e:
-                if e.args != (key,):
-                    raise
-                continue
-            return result
-    elif isinstance(current, list):
-        for value in current:
-            try:
-                result = _find_att(root, value, key, default_region)
-            except KeyError as e:
-                if e.args != (key,):
-                    raise
-                continue
-            return result
-    raise KeyError(key)
+    def fn_sub(self, value):
+        """
+        >>> from aws_parsecf.parser import Parser
 
-SUB_VARIABLE_PATTERN = re.compile(r"\${(.+)}")
-def _sub_variable(root, default_region, match):
-    variable = match.group(1)
-    if variable.startswith('!'):
-        return "${{{}}}".format(variable[1:])
-    elif '.' in variable:
-        return fn_get_att(root, variable.split('.'), default_region)
-    else:
-        return fn_get_ref(root, variable, default_region)
+        >>> root = {'Fn::Sub': ['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}]}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub(['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}])
+        'hello-world NOW'
 
-REF_PSEUDO_FUNCTIONS = {
-        'AWS::NoValue': lambda root, default_region: DELETE,
-        'AWS::Region': lambda root, default_region: default_region,
-        }
+        >>> root = {'Fn::Sub': 'hello world'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub('hello world')
+        'hello world'
 
-REF_RESOURCE_TYPE_PATTERN = re.compile(r"^.+::(.+?)$")
+        >>> root = {'Resources':
+        ...             {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
+        ...         'Fn::Sub': 'hello ${SomeResource.SomeKey}'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub('hello ${SomeResource.SomeKey}')
+        'hello SomeValue'
+
+        >>> root = {'Resources':
+        ...             {'SomeResource': {'Properties': {'SomeKey': 'SomeValue'}}},
+        ...         'Fn::Sub': 'hello ${!SomeResource.SomeKey}'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub('hello ${!SomeResource.SomeKey}')
+        'hello ${SomeResource.SomeKey}'
+        """
+
+        if isinstance(value, list):
+            value, variables = value
+        else:
+            # only template parameter names, resource logical IDs, and resource attributes, will be parsed
+            value, variables = value, {}
+
+        for name, target in variables.items():
+            value = value.replace('${{{}}}'.format(name), target)
+
+        return Functions.SUB_VARIABLE_PATTERN.sub(self._sub_variable, value)
+
+    def ref(self, value):
+        """
+        >>> from aws_parsecf.parser import Parser
+
+        >>> root = {'Ref': 'AWS::Region'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('AWS::Region')
+        'us-east-1'
+
+        >>> root = {'Ref': 'AWS::NoValue'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('AWS::NoValue')
+        DELETE
+
+        >>> root = {'Resources':
+        ...             {'SomeFunction': {'Type': 'AWS::Lambda::Function', 'Properties': {'FunctionName': 'SomeFunctionName'}}},
+        ...         'Ref': 'SomeFunction'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('SomeFunction')
+        'SomeFunctionName'
+
+        >>> root = {'Resources':
+        ...             {'SomeFunction': {'Type': 'AWS::Lambda::Function', 'Properties': {}}},
+        ...         'Ref': 'SomeFunction'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('SomeFunction')
+        'UNKNOWN REF: SomeFunction'
+
+        >>> root = {'Ref': 'SomeValue'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('SomeValue')
+        'UNKNOWN REF: SomeValue'
+        """
+
+        # pseudo function?
+        function = Functions.REF_PSEUDO_FUNCTIONS.get(value)
+        if function:
+            return function(self)
+        # resource logical id?
+        if value in self.root.get('Resources', ()):
+            resource = self.parser.exploded(self.root['Resources'], value)
+            name_type = Functions.REF_RESOURCE_TYPE_PATTERN.match(resource['Type'])
+            if name_type:
+                name = resource['Properties'].get("{}Name".format(name_type.group(1)))
+                if name:
+                    return name
+
+        return "UNKNOWN REF: {}".format(value)
+
+    def _find_att(self, current, key):
+        if isinstance(current, dict):
+            if key in current:
+                return current[key]
+            for value in current.values():
+                try:
+                    result = self._find_att(value, key)
+                except KeyError as e:
+                    if e.args != (key,):
+                        raise
+                    continue
+                return result
+        elif isinstance(current, list):
+            for value in current:
+                try:
+                    result = self._find_att(value, key)
+                except KeyError as e:
+                    if e.args != (key,):
+                        raise
+                    continue
+                return result
+        raise KeyError(key)
+
+    SUB_VARIABLE_PATTERN = re.compile(r"\${(.+)}")
+    def _sub_variable(self, match):
+        variable = match.group(1)
+        if variable.startswith('!'):
+            return "${{{}}}".format(variable[1:])
+        elif '.' in variable:
+            return self.fn_get_att(variable.split('.'))
+        else:
+            return self.fn_get_ref(variable)
+
+    REF_PSEUDO_FUNCTIONS = {
+            'AWS::NoValue': lambda self: DELETE,
+            'AWS::Region': lambda self: self.default_region,
+            }
+
+    REF_RESOURCE_TYPE_PATTERN = re.compile(r"^.+::(.+?)$")
 
