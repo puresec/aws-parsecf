@@ -304,7 +304,7 @@ class Functions:
             resource = self.parser.exploded(self.root['Resources'], value)
             name_type = Functions.REF_RESOURCE_TYPE_PATTERN.match(resource['Type'])
             if name_type:
-                name = resource['Properties'].get("{}Name".format(name_type.group(1)))
+                name = resource.get('Properties', {}).get("{}Name".format(name_type.group(1)))
                 if name:
                     return name
 
@@ -341,7 +341,7 @@ class Functions:
         elif '.' in variable:
             return self.fn_get_att(variable.split('.'))
         else:
-            return self.fn_get_ref(variable)
+            return self.ref(variable)
 
     REF_PSEUDO_FUNCTIONS = {
             'AWS::NoValue': lambda self: DELETE,
