@@ -61,6 +61,6 @@ Running tests:
 
 Missing pieces:
 
--  ``Ref`` - currently supports a handful of resource types
+-  Support YAML short form.
 
 You know the drill, PR!

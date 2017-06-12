@@ -159,13 +159,12 @@ class Functions:
                 ]
 
     def fn_import_value(self, value):
-        if hasattr(self, '_import_value_cache'):
-            return self._import_value_cache[value]
-        self._import_value_cache = dict(
-                (export['Name'], export['Value']) for export in
-                boto3.client('cloudformation', region_name=self.default_region).list_exports()['Exports']
-                )
-        return self._import_value_cache[value]
+        if not hasattr(self, '_import_value_cache'):
+            self._import_value_cache = dict(
+                    (export['Name'], export['Value']) for export in
+                    boto3.client('cloudformation', region_name=self.default_region).list_exports()['Exports']
+                    )
+        return self._import_value_cache.get(value, "UNKNOWN IMPORT VALUE: {}".format(value))
 
     def fn_join(self, value):
         """
