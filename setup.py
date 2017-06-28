@@ -11,6 +11,7 @@ setup(
     url='https://github.com/puresec/aws-parsecf',
     packages=find_packages(exclude=['tests*']),
     install_requires=[
+        'PyYAML',
         'boto3',
     ],
 )
