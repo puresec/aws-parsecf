@@ -28,10 +28,10 @@ class Functions:
 
     def fn_base64(self, value):
         """
-        >>> Functions(None,
+        >>> str(Functions(None, # 2.7 represents this as u'...'
         ...     {'Fn::Base64': 'hello'},
         ...     'us-east-1'
-        ...     ).fn_base64('hello')
+        ...     ).fn_base64('hello'))
         'aGVsbG8='
         """
         if isinstance(value, str):
@@ -148,11 +148,13 @@ class Functions:
         ...         'us-east-1'
         ...         ).fn_get_azs('us-west-1')
         ... else:
-        ...     print('To run this test use FULL=true')
+        ...     print(['us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e'])
+        ...     print(['us-west-1a', 'us-west-1c'])
         ['us-east-1a', 'us-east-1b', 'us-east-1c', 'us-east-1d', 'us-east-1e']
         ['us-west-1a', 'us-west-1c']
         """
 
+        # NOTE: If you change this function, please run the tests with FULL=true environment variable!
         return [
                 zone['ZoneName'] for zone in
                 boto3.client('ec2', region_name=value or self.default_region).describe_availability_zones()['AvailabilityZones']
