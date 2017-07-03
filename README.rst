@@ -56,8 +56,8 @@ Running tests:
 
 .. code:: bash
 
-    pip install -r requirements.txt
-    nosetests -c nose.cfg aws_parsecf
+    ./setup.py install
+    ./setup.py test
 
 Missing pieces:
 
