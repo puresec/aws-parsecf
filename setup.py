@@ -14,5 +14,6 @@ setup(
         'PyYAML',
         'boto3',
     ],
+    setup_requires=['nose', 'coverage'],
 )
 
