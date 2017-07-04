@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='aws-parsecf',
-    version='1.0.0',
+    version='1.0.1',
     description="Parse AWS CloudFormation's intrinsic functions in the template",
     long_description=open('README.rst').read(),
     author='Oded Niv <oded.niv@gmail.com>',
