@@ -117,7 +117,14 @@ class Functions:
         ...     ).fn_get_att(['SomeResource', 'SomeKey'])
         'SomeValue'
 
-        >>> root = {'Resources': {'SomeResource': {}},
+        >>> root = {'Fn::GetAtt': ['SomeResource', 'SomeKey']}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_get_att(['SomeResource', 'SomeKey'])
+        'UNKNOWN ATT: SomeResource.SomeKey'
+
+        >>> root = {'Resources': {},
         ...         'Fn::GetAtt': ['SomeResource', 'SomeKey']}
         >>> Functions(Parser(root, 'us-east-1'),
         ...     root,
@@ -127,13 +134,15 @@ class Functions:
         """
 
         resource_name, key = value
-        resource = self.parser.exploded(self.root['Resources'], resource_name)
-        try:
-            return self._find_att(resource, key)
-        except KeyError as e:
-            if e.args != (key,):
-                raise
-            return "UNKNOWN ATT: {}.{}".format(resource_name, key)
+        if resource_name in self.root.get('Resources', ()):
+            resource = self.parser.exploded(self.root['Resources'], resource_name)
+            try:
+                return self._find_att(resource, key)
+            except KeyError as e:
+                if e.args != (key,):
+                    raise
+
+        return "UNKNOWN ATT: {}.{}".format(resource_name, key)
 
     def fn_get_azs(self, value):
         """
