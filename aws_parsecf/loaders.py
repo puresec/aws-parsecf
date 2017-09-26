@@ -3,16 +3,16 @@ import boto3
 import json
 import yaml
 
-def load_json(stream, default_region=boto3.Session().region_name):
-    return _load(json.load(stream), default_region)
+def load_json(stream, default_region=boto3.Session().region_name, parameters={}):
+    return _load(json.load(stream), default_region, parameters)
 
-def loads_json(string, default_region=boto3.Session().region_name):
-    return _load(json.loads(string), default_region)
+def loads_json(string, default_region=boto3.Session().region_name, parameters={}):
+    return _load(json.loads(string), default_region, parameters)
 
-def load_yaml(stream_or_string, default_region=boto3.Session().region_name):
-    return _load(yaml.load(stream_or_string), default_region)
+def load_yaml(stream_or_string, default_region=boto3.Session().region_name, parameters={}):
+    return _load(yaml.load(stream_or_string), default_region, parameters)
 
-def _load(root, default_region):
+def _load(root, default_region, parameters={}):
     """
     >>> import json
 
@@ -62,7 +62,7 @@ def _load(root, default_region):
 
     if not default_region:
         raise TypeError("No default region in aws configuration, please specify one (with `aws configure` or `default_region=`)")
-    parser = Parser(root, default_region)
+    parser = Parser(root, default_region, parameters)
     parser.explode(root)
     parser.cleanup(root)
     return root

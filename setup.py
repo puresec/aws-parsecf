@@ -15,7 +15,8 @@ setup(
         'PyYAML',
         'boto3',
     ],
-    setup_requires=['nose', 'coverage'],
+    setup_requires=['nose'],
+    tests_require=['coverage'],
 
     license='MIT',
     classifiers=[

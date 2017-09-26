@@ -1,27 +1,28 @@
-from aws_parsecf.common import DELETE
+from aws_parsecf.common import DELETE, UnknownValue
 import base64
 import boto3
 import re
 
 class Functions:
-    def __init__(self, parser, root, default_region):
+    def __init__(self, parser, root, default_region, parameters={}):
         self.parser = parser
         self.root = root
         self.default_region = default_region
+        self.parameters = parameters
 
     MAP = {
-            'Fn::Base64': 'fn_base64',
-            'Fn::If': 'fn_if',
-            'Fn::FindInMap': 'fn_find_in_map',
-            'Fn::GetAtt': 'fn_get_att',
-            'Fn::GetAZs': 'fn_get_azs',
-            'Fn::ImportValue': 'fn_import_value',
-            'Fn::Join': 'fn_join',
-            'Fn::Select': 'fn_select',
-            'Fn::Split': 'fn_split',
-            'Fn::Sub': 'fn_sub',
-            'Ref': 'ref',
-            }
+        'Fn::Base64': 'fn_base64',
+        'Fn::If': 'fn_if',
+        'Fn::FindInMap': 'fn_find_in_map',
+        'Fn::GetAtt': 'fn_get_att',
+        'Fn::GetAZs': 'fn_get_azs',
+        'Fn::ImportValue': 'fn_import_value',
+        'Fn::Join': 'fn_join',
+        'Fn::Select': 'fn_select',
+        'Fn::Split': 'fn_split',
+        'Fn::Sub': 'fn_sub',
+        'Ref': 'ref',
+    }
 
     def evaluate(self, function_type, value):
         return getattr(self, Functions.MAP[function_type])(value)
@@ -142,7 +143,7 @@ class Functions:
                 if e.args != (key,):
                     raise
 
-        return "UNKNOWN ATT: {}.{}".format(resource_name, key)
+        return UnknownValue("ATT: {}.{}".format(resource_name, key))
 
     def fn_get_azs(self, value):
         """
@@ -175,7 +176,7 @@ class Functions:
                     (export['Name'], export['Value']) for export in
                     boto3.client('cloudformation', region_name=self.default_region).list_exports()['Exports']
                     )
-        return self._import_value_cache.get(value, "UNKNOWN IMPORT VALUE: {}".format(value))
+        return self._import_value_cache.get(value, UnknownValue("IMPORT VALUE: {}".format(value)))
 
     def fn_join(self, value):
         """
@@ -288,6 +289,39 @@ class Functions:
         ...     ).ref('SomeFunction')
         'SomeFunctionName'
 
+        >>> root = {'Parameters': {'SomeParameter': {'Type': 'String', 'Default': "SomeValue"}},
+        ...         'Ref': 'SomeParameter'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1',
+        ...     ).ref('SomeParameter')
+        'SomeValue'
+
+        >>> root = {'Parameters': {'SomeParameter': {'Type': 'String'}},
+        ...         'Ref': 'SomeParameter'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1',
+        ...     {'SomeParameter': "SomeValue"}
+        ...     ).ref('SomeParameter')
+        'SomeValue'
+
+        >>> root = {'Parameters': {'SomeParameter': {'Type': 'String'}},
+        ...         'Ref': 'SomeParameter'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).ref('SomeParameter')
+        'UNKNOWN REF: SomeParameter'
+
+        >>> root = {'Ref': 'SomeParameter'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1',
+        ...     {'SomeParameter': "SomeValue"},
+        ...     ).ref('SomeParameter')
+        'UNKNOWN REF: SomeParameter'
+
         >>> root = {'Resources':
         ...             {'SomeFunction': {'Type': 'AWS::Lambda::Function', 'Properties': {}}},
         ...         'Ref': 'SomeFunction'}
@@ -309,6 +343,14 @@ class Functions:
         function = Functions.REF_PSEUDO_FUNCTIONS.get(value)
         if function:
             return function(self)
+        # parameter?
+        if value in self.root.get('Parameters', ()):
+            if value in self.parameters:
+                return self.parameters[value]
+            parameter = self.parser.exploded(self.root['Parameters'], value)
+            if 'Default' in parameter:
+                return parameter['Default']
+            return UnknownValue("REF: {}".format(value))
         # resource logical id?
         if value in self.root.get('Resources', ()):
             resource = self.parser.exploded(self.root['Resources'], value)
@@ -318,7 +360,7 @@ class Functions:
                 if name:
                     return name
 
-        return "UNKNOWN REF: {}".format(value)
+        return UnknownValue("REF: {}".format(value))
 
     def _find_att(self, current, key):
         if isinstance(current, dict):
@@ -354,9 +396,9 @@ class Functions:
             return self.ref(variable)
 
     REF_PSEUDO_FUNCTIONS = {
-            'AWS::NoValue': lambda self: DELETE,
-            'AWS::Region': lambda self: self.default_region,
-            }
+        'AWS::NoValue': lambda self: DELETE,
+        'AWS::Region': lambda self: self.default_region,
+    }
 
     REF_RESOURCE_TYPE_PATTERN = re.compile(r"^.+::(.+?)$")
 

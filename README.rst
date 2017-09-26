@@ -49,6 +49,13 @@ region:
 
     aws_parsecf.load_json(stream, region='us-west-1')
 
+If your stack is parameterized, the default values will be used along with
+possibly supplying parameters:
+
+.. code:: python
+
+    aws_parsecf.load_json(stream, region, {'DomainName': "aws.parsecf.com"})
+
 Contributing
 ------------
 
@@ -56,7 +63,6 @@ Running tests:
 
 .. code:: bash
 
-    ./setup.py install
     ./setup.py test
 
 Missing pieces:
