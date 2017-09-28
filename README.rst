@@ -1,7 +1,7 @@
 aws-parsecf
 ===========
 
-(Tries to) parse AWS CloudFormation’s intrinsic functions in the
+(Tries to) parse AWS CloudFormation's intrinsic functions in the
 template.
 
 Quick Start
