@@ -23,7 +23,7 @@ Then, from a Python interpreter:
         print(aws_parsecf.load_json(f))
 
 **Note** that some of the intrinsic functions require a configured
-environment (like ``"Fn::GetAZs"``), so if you don’t have it set:
+environment (like ``"Fn::GetAZs"``), so if you don't have it set:
 
 .. code:: bash
 
@@ -41,7 +41,7 @@ Usage
     aws_parsecf.load_yaml(stream_or_string, region)
 
 ``region`` is optional, and defaults to the region you specified when using
-``aws configure``. If you didn’t specify a default region in
+``aws configure``. If you didn't specify a default region in
 ``aws configure``, or you want to override it, you should specify your
 region:
 
