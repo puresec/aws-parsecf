@@ -3,8 +3,8 @@ from aws_parsecf.conditions import Conditions
 from aws_parsecf.functions import Functions
 
 class Parser:
-    def __init__(self, root, default_region):
-        self.functions = Functions(self, root, default_region)
+    def __init__(self, root, default_region, parameters={}):
+        self.functions = Functions(self, root, default_region, parameters)
         self.conditions = Conditions(self, root, default_region)
 
     def explode(self, current):
