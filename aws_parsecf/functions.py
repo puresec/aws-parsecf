@@ -385,7 +385,7 @@ class Functions:
                 return result
         raise KeyError(key)
 
-    SUB_VARIABLE_PATTERN = re.compile(r"\${(.+)}")
+    SUB_VARIABLE_PATTERN = re.compile(r"\${(.+?)}")
     def _sub_variable(self, match):
         variable = match.group(1)
         if variable.startswith('!'):
