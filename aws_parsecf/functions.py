@@ -218,6 +218,15 @@ class Functions:
         """
         >>> from aws_parsecf.parser import Parser
 
+        >>> root = {'Parameters': {'Who': {'Type': 'String', 'Default': 'world'},
+        ...                        'When': {'Type': 'String', 'Default': 'NOW'}},
+        ...         'Fn::Sub': 'hello-${Who} ${When}'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub('hello-${Who} ${When}')
+        'hello-world NOW'
+
         >>> root = {'Fn::Sub': ['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}]}
         >>> Functions(Parser(root, 'us-east-1'),
         ...     root,
@@ -385,7 +394,7 @@ class Functions:
                 return result
         raise KeyError(key)
 
-    SUB_VARIABLE_PATTERN = re.compile(r"\${(.+)}")
+    SUB_VARIABLE_PATTERN = re.compile(r"\${(.+?)}")
     def _sub_variable(self, match):
         variable = match.group(1)
         if variable.startswith('!'):
