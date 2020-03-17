@@ -218,6 +218,15 @@ class Functions:
         """
         >>> from aws_parsecf.parser import Parser
 
+        >>> root = {'Parameters': {'Who': {'Type': 'String', 'Default': 'world'},
+        ...                        'When': {'Type': 'String', 'Default': 'NOW'}},
+        ...         'Fn::Sub': 'hello-${Who} ${When}'}
+        >>> Functions(Parser(root, 'us-east-1'),
+        ...     root,
+        ...     'us-east-1'
+        ...     ).fn_sub('hello-${Who} ${When}')
+        'hello-world NOW'
+
         >>> root = {'Fn::Sub': ['hello-${Who} ${When}', {'Who': 'world', 'When': 'NOW'}]}
         >>> Functions(Parser(root, 'us-east-1'),
         ...     root,
