@@ -39,6 +39,7 @@ class Parser:
                         if e.args != (key,):
                             raise
                         # not a condition
+            del current['_exploded']
         # array
         elif isinstance(current, list):
             for index, value in enumerate(current):
